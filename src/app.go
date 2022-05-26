@@ -39,6 +39,8 @@ func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/products", a.getProducts).Methods("GET")
 	a.Router.HandleFunc("/product", a.createProduct).Methods("POST")
 	a.Router.HandleFunc("/product/{id:[0-9]+}", a.getProduct).Methods("GET")
+	a.Router.HandleFunc("/product/search", a.searchProducts).Queries("name", "{name}").Methods("GET")
+	a.Router.HandleFunc("/product/meta/count", a.getProductCount).Methods("GET")
 	a.Router.HandleFunc("/product/{id:[0-9]+}", a.updateProduct).Methods("PUT")
 	a.Router.HandleFunc("/product/{id:[0-9]+}", a.deleteProduct).Methods("DELETE")
 }
@@ -64,6 +66,35 @@ func (a *App) getProduct(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	respondWithJSON(writer, http.StatusOK, p)
+}
+
+func (a *App) searchProducts(writer http.ResponseWriter, request *http.Request) {
+	searchTerm := request.URL.Query().Get("name")
+
+	if len(searchTerm) == 0 {
+		respondWithError(writer, http.StatusBadRequest, "Invalid search term for name")
+		return
+	}
+
+	p := product{Name: searchTerm}
+
+	products, err := p.searchProducts(a.DB)
+	if err != nil {
+		respondWithError(writer, http.StatusInternalServerError, err.Error())
+	}
+
+	respondWithJSON(writer, http.StatusOK, products)
+}
+
+func (a *App) getProductCount(writer http.ResponseWriter, request *http.Request) {
+	p := product{}
+
+	count, err := p.getNumberOfProducts(a.DB)
+	if err != nil {
+		respondWithError(writer, http.StatusInternalServerError, err.Error())
+	}
+
+	respondWithJSON(writer, http.StatusOK, count)
 }
 
 func (a *App) getProducts(w http.ResponseWriter, r *http.Request) {

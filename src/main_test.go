@@ -3,12 +3,14 @@ package main_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/mdumfart/go-mux"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -123,6 +125,94 @@ func TestGetProduct(t *testing.T) {
 	checkResponseCode(t, http.StatusOK, response.Code)
 }
 
+func TestSearchProducts(t *testing.T) {
+	clearTable()
+	addProducts(3)
+
+	req, _ := http.NewRequest("GET", "/product/search?name=DUCT", nil)
+	response := executeRequest(req)
+
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	var m []map[string]interface{}
+	json.Unmarshal(response.Body.Bytes(), &m)
+
+	checkLength(t, m, 3)
+
+	for i := 0; i < len(m); i++ {
+		checkNameContains(t, m[i], "DUCT")
+	}
+}
+
+func TestSearchProducts_NoResults(t *testing.T) {
+	clearTable()
+	addProducts(3)
+
+	req, _ := http.NewRequest("GET", "/product/search?name=something", nil)
+	response := executeRequest(req)
+
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	var m []map[string]interface{}
+	json.Unmarshal(response.Body.Bytes(), &m)
+
+	checkLength(t, m, 0)
+}
+
+func TestSearchProducts_InvalidRequest(t *testing.T) {
+	clearTable()
+	addProducts(3)
+
+	req, _ := http.NewRequest("GET", "/product/search?name=", nil)
+	response := executeRequest(req)
+
+	checkResponseCode(t, http.StatusBadRequest, response.Code)
+}
+
+func TestGetProductCount(t *testing.T) {
+	clearTable()
+	addProducts(5)
+
+	req, _ := http.NewRequest("GET", "/product/meta/count", nil)
+	response := executeRequest(req)
+
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	var m interface{}
+	json.Unmarshal(response.Body.Bytes(), &m)
+
+	checkCount(t, m, 5)
+}
+
+func TestGetProductCount_Empty(t *testing.T) {
+	clearTable()
+
+	req, _ := http.NewRequest("GET", "/product/meta/count", nil)
+	response := executeRequest(req)
+
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	var m interface{}
+	json.Unmarshal(response.Body.Bytes(), &m)
+
+	checkCount(t, m, 0)
+}
+
+func TestGetProductCount_Many(t *testing.T) {
+	clearTable()
+	addProducts(100)
+
+	req, _ := http.NewRequest("GET", "/product/meta/count", nil)
+	response := executeRequest(req)
+
+	checkResponseCode(t, http.StatusOK, response.Code)
+
+	var m interface{}
+	json.Unmarshal(response.Body.Bytes(), &m)
+
+	checkCount(t, m, 100)
+}
+
 func TestGetNonExistentProduct(t *testing.T) {
 	clearTable()
 
@@ -175,6 +265,32 @@ func addProducts(count int) {
 func checkResponseCode(t *testing.T, expected int, actual int) {
 	if expected != actual {
 		t.Errorf("Expected response code %d. Got %d\n", expected, actual)
+	}
+}
+
+func checkNameContains(t *testing.T, m map[string]interface{}, s string) {
+	name := fmt.Sprintf("%v", m["name"])
+	nameLower := strings.ToLower(name)
+	sLower := strings.ToLower(s)
+
+	if !strings.Contains(nameLower, sLower) {
+		t.Errorf("Expected name %s to contain %s.\n", name, s)
+	}
+}
+
+func checkLength(t *testing.T, m []map[string]interface{}, i int) {
+	if len(m) != i {
+		t.Errorf("Expected array length to be %d. Got length of %d", i, len(m))
+	}
+}
+
+func checkCount(t *testing.T, m interface{}, expected int) {
+	tt := fmt.Sprintf("%v", m)
+
+	count, _ := strconv.Atoi(tt)
+
+	if count != expected {
+		t.Errorf("Expected count to be %d. Got count of %d", expected, count)
 	}
 }
 

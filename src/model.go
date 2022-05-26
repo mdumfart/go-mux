@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"strings"
 )
 
 type product struct {
@@ -13,6 +14,44 @@ type product struct {
 func (p *product) getProduct(db *sql.DB) error {
 	return db.QueryRow("SELECT name, price FROM products WHERE id=$1",
 		p.ID).Scan(&p.Name, &p.Price)
+}
+
+func (p *product) getNumberOfProducts(db *sql.DB) (int, error) {
+	row := db.QueryRow("SELECT COUNT(*) FROM products")
+
+	var count int
+
+	err := row.Scan(&count)
+	if err != nil {
+		return -1, err
+	}
+
+	return count, nil
+}
+
+func (p *product) searchProducts(db *sql.DB) ([]product, error) {
+	rows, err := db.Query("SELECT id, name, price FROM products WHERE LOWER(name) LIKE '%' || $1 || '%'", strings.ToLower(p.Name))
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []product
+
+	for rows.Next() {
+		var p product
+		if err := rows.Scan(&p.ID, &p.Name, &p.Price); err != nil {
+			return products, err
+		}
+		products = append(products, p)
+	}
+
+	if err = rows.Err(); err != nil {
+		return products, err
+	}
+
+	return products, nil
 }
 
 func (p *product) updateProduct(db *sql.DB) error {
