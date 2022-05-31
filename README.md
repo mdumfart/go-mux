@@ -5,3 +5,7 @@
 ### Contributers:
 
 * Michael Dumfart, S2110455001
+
+### CI
+* Github Actions
+* SonarCloud
